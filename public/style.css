@@ -346,6 +346,35 @@ html, body {
   z-index: 20;
 }
 
+.review-fly-layer {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+.review-fly-item {
+  position: absolute;
+  top: -60px;
+  left: -300px;
+  background: var(--card);
+  border: 2px solid var(--line);
+  box-shadow: 2px 2px 0 var(--line);
+  padding: 6px 12px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0.55;
+  animation-name: fly-diagonal;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+@keyframes fly-diagonal {
+  0% { transform: translate(0, 0) rotate(-12deg); }
+  100% { transform: translate(140vw, 160vh) rotate(-12deg); }
+}
+
+.app-frame, .hero, .container { position: relative; z-index: 1; }
+
 .disclaimer {
   font-size: 10.5px;
   color: var(--muted);

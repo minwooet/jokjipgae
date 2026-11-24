@@ -113,6 +113,13 @@ async function handleAnalyze(req, res) {
       const { imageBase64, mediaType, mode, clientIsFirstUse, clientHasBonusCredit } = input;
       if (!imageBase64) throw new Error('이미지가 없습니다.');
 
+      const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
+      if (db.isDbConfigured() && !userId) {
+        res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'LOGIN_REQUIRED', message: '로그인 후 이용할 수 있어요. 카카오 로그인을 먼저 해주세요.' }));
+        return;
+      }
+
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
         res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -135,7 +142,6 @@ async function handleAnalyze(req, res) {
 
       // ---- 무료/보너스 사용 여부 판단 ----
       let unlockLevel = 'teaser';
-      const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
 
       if (userId) {
         const user = (await db.getUser(userId)) || (await db.upsertUser(userId, null));
@@ -182,8 +188,9 @@ async function handleGetReviews(req, res) {
   if (db.isDbConfigured()) {
     try {
       const stats = await db.getReviewStats();
+      const visits = await db.getVisitCount().catch(() => 0);
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify(stats));
+      res.end(JSON.stringify({ ...stats, visits }));
       return;
     } catch (err) {
       console.error('리뷰 조회 실패(DB):', err.message);
@@ -194,7 +201,20 @@ async function handleGetReviews(req, res) {
   const avgRating = count ? reviews.reduce((sum, r) => sum + r.rating, 0) / count : 0;
   const recent = reviews.slice(-6).reverse().map((r) => ({ rating: r.rating, comment: r.comment }));
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ count, avgRating: Math.round(avgRating * 10) / 10, recent }));
+  res.end(JSON.stringify({ count, avgRating: Math.round(avgRating * 10) / 10, recent, visits: 0 }));
+}
+
+async function handleVisit(req, res) {
+  let visits = 0;
+  if (db.isDbConfigured()) {
+    try {
+      visits = await db.incrementVisit();
+    } catch (err) {
+      console.error('방문자 카운트 실패:', err.message);
+    }
+  }
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ visits }));
 }
 
 function handlePostReview(req, res) {
@@ -287,6 +307,7 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && reqUrl === '/api/analyze') return handleAnalyze(req, res);
   if (req.method === 'GET' && reqUrl === '/api/reviews') return handleGetReviews(req, res);
+  if (req.method === 'POST' && reqUrl === '/api/visit') return handleVisit(req, res);
   if (req.method === 'POST' && reqUrl === '/api/reviews') return handlePostReview(req, res);
   if (req.method === 'GET' && reqUrl === '/api/auth/me') return handleAuthMe(req, res);
   if (req.method === 'GET' && reqUrl === '/api/auth/kakao/login') return handleKakaoLogin(req, res);

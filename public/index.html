@@ -21,12 +21,20 @@
       <img class="mascot-photo hero-mascot" src="images/mascot/dog.jpg" alt="복동이" />
       <h1 class="pixel-font">사진 한 장으로 보는<br />오늘의 동물상 관상</h1>
       <p>눈·코·입·귀까지 꼼꼼하게, 족집개처럼 집어드려요</p>
-      <div class="coin-badge pixel-font">🪙 첫 1회 완전 무료 · 이후 990원</div>
+      <div class="coin-badge pixel-font">🪙 첫 1회 완전 무료 · 이후 490원</div>
       <div class="social-proof" id="social-proof"></div>
     </section>
 
     <div class="container" id="tool">
-      <section id="step-upload" class="step active">
+      <section id="step-login" class="step active">
+        <div class="pixel-box" style="text-align:center;">
+          <h2 class="section-title pixel-font" style="justify-content:center;">🔒 로그인하고 시작하기</h2>
+          <p style="font-size:12.5px;color:var(--muted);margin:0 0 14px;">카카오 로그인하면 첫 1회 무료 체험과 리뷰 적립 기회가 내 계정에 저장돼요.</p>
+          <a href="/api/auth/kakao/login" class="pixel-btn" style="display:block;text-decoration:none;">카카오 로그인하고 시작하기</a>
+        </div>
+      </section>
+
+      <section id="step-upload" class="step">
         <div class="pixel-box">
           <h2 class="section-title pixel-font">📷 누구를 볼까요?</h2>
           <div class="mode-toggle">
@@ -42,7 +50,7 @@
           <div class="file-drop" id="drop-zone">사진을 선택해주세요<br />(정면 얼굴이 잘 보이는 사진일수록 정확해요)</div>
           <input type="file" id="file-input" accept="image/*" style="display:none" />
           <img id="preview-img" />
-          <button class="pixel-btn" id="btn-analyze" disabled>족집게에게 보여주기</button>
+          <button class="pixel-btn" id="btn-analyze" disabled>족집개에게 보여주기</button>
         </div>
       </section>
 
@@ -176,10 +184,12 @@
     <div class="bottom-fixed" id="unlock-bar" style="display:none;">
       <div class="unlock-options">
         <button class="pixel-btn ghost small" id="btn-share">📤 공유하고 무료로 보기</button>
-        <button class="pixel-btn small" id="btn-unlock">🪙 990원 결제하고 보기</button>
+        <button class="pixel-btn small" id="btn-unlock">🪙 490원 결제하고 보기</button>
       </div>
     </div>
   </div>
+
+  <div class="review-fly-layer" id="review-fly-layer"></div>
 
   <script type="module" src="main.js"></script>
 </body>

@@ -79,6 +79,27 @@ export async function addReview(userId, rating, comment) {
   });
 }
 
+export async function incrementVisit() {
+  const res = await fetch(restUrl('site_stats?id=eq.main&select=visits'), { headers: headers() });
+  if (!res.ok) throw new Error(`site_stats 조회 실패: ${res.status} ${await res.text()}`);
+  const rows = await res.json();
+  const current = rows[0]?.visits || 0;
+  const writeRes = await fetch(restUrl('site_stats'), {
+    method: 'POST',
+    headers: headers({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify([{ id: 'main', visits: current + 1 }]),
+  });
+  if (!writeRes.ok) throw new Error(`site_stats 기록 실패: ${writeRes.status} ${await writeRes.text()}`);
+  return current + 1;
+}
+
+export async function getVisitCount() {
+  const res = await fetch(restUrl('site_stats?id=eq.main&select=visits'), { headers: headers() });
+  if (!res.ok) throw new Error(`site_stats 조회 실패: ${res.status} ${await res.text()}`);
+  const rows = await res.json();
+  return rows[0]?.visits || 0;
+}
+
 export async function getReviewStats() {
   const res = await fetch(restUrl('reviews?select=rating,comment&order=id.desc&limit=200'), {
     headers: headers(),

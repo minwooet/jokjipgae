@@ -3,7 +3,7 @@ const BONUS_CREDIT_KEY = 'faceReadingBonusCredits';
 
 const state = { mode: 'self', base64: null, mediaType: null, basicResult: null, unlockedViaShare: false, selectedStars: 0 };
 
-const steps = ['upload', 'loading', 'error', 'free', 'paid'];
+const steps = ['login', 'upload', 'loading', 'error', 'free', 'paid'];
 function showStep(name) {
   for (const s of steps) {
     document.getElementById(`step-${s}`).classList.toggle('active', s === name);
@@ -26,22 +26,41 @@ function addBonusCredit() {
   localStorage.setItem(BONUS_CREDIT_KEY, String(getBonusCredits() + 1));
 }
 
-// ---- 사회적 증거(실제 리뷰) ----
+// ---- 사회적 증거(실제 리뷰 + 방문자 수) ----
 async function loadSocialProof() {
   try {
     const res = await fetch('/api/reviews');
     const data = await res.json();
     const el = document.getElementById('social-proof');
+    const visitText = `👀 누적 방문 ${data.visits ?? 0}명`;
     if (data.count === 0) {
-      el.textContent = '아직 리뷰가 없어요 — 첫 리뷰어가 되어주세요! 🙋';
+      el.textContent = `${visitText} · 아직 리뷰가 없어요, 첫 리뷰어가 되어주세요! 🙋`;
     } else {
-      el.textContent = `⭐ ${data.avgRating} (${data.count}명 참여) · 실제 이용자 리뷰 기반`;
+      el.textContent = `${visitText} · ⭐ ${data.avgRating} (${data.count}명 참여)`;
     }
+    spawnFlyingReviews(data.recent || []);
   } catch (e) {
     // 조용히 무시
   }
 }
 loadSocialProof();
+fetch('/api/visit', { method: 'POST' }).catch(() => {});
+
+function spawnFlyingReviews(recent) {
+  const layer = document.getElementById('review-fly-layer');
+  layer.innerHTML = '';
+  if (!recent.length) return;
+  recent.forEach((r, i) => {
+    const el = document.createElement('div');
+    el.className = 'review-fly-item';
+    const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+    el.textContent = `${stars} ${r.comment || ''}`.trim();
+    el.style.animationDuration = `${14 + i * 2}s`;
+    el.style.animationDelay = `${i * 2.3}s`;
+    el.style.top = `${-10 - i * 5}%`;
+    layer.appendChild(el);
+  });
+}
 
 // ---- 로그인 상태 ----
 let authState = { loggedIn: false };
@@ -55,9 +74,11 @@ async function loadAuthState() {
       loginBtn.style.display = 'none';
       userChip.style.display = 'inline-block';
       userChip.textContent = `👋 ${authState.nickname || '회원'}님 (로그아웃)`;
+      if (document.getElementById('step-login').classList.contains('active')) showStep('upload');
     } else {
       loginBtn.style.display = 'inline-block';
       userChip.style.display = 'none';
+      showStep('login');
     }
   } catch (e) {
     // 조용히 무시
@@ -135,6 +156,10 @@ async function runAnalysis() {
     });
     const data = await res.json();
 
+    if (data.error === 'LOGIN_REQUIRED') {
+      showStep('login');
+      return;
+    }
     if (data.error) {
       showError(data.error);
       return;
