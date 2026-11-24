@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>족집개 - 오늘의 동물상 관상</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-frame">
+    <div class="app-bar">
+      <span class="logo-dot">🐾</span>
+      <span class="logo-text pixel-font">족집개</span>
+    </div>
+
+    <section class="hero">
+      <div class="speech-bubble pixel-font">족집개처럼 콕 집어드릴게!</div>
+      <img class="mascot-photo hero-mascot" src="images/mascot/dog.jpg" alt="복동이" />
+      <h1 class="pixel-font">사진 한 장으로 보는<br />오늘의 동물상 관상</h1>
+      <p>눈·코·입·귀까지 꼼꼼하게, 족집개처럼 집어드려요</p>
+      <div class="coin-badge pixel-font">🪙 첫 1회 완전 무료 · 이후 990원</div>
+      <div class="social-proof" id="social-proof"></div>
+    </section>
+
+    <div class="container" id="tool">
+      <section id="step-upload" class="step active">
+        <div class="pixel-box">
+          <h2 class="section-title pixel-font">📷 누구를 볼까요?</h2>
+          <div class="mode-toggle">
+            <button id="mode-self" class="active pixel-font">내 얼굴</button>
+            <button id="mode-other" class="pixel-font">궁금한 사람</button>
+          </div>
+          <div class="notice-box" id="other-notice" style="display:none;">
+            다른 분의 사진을 올리실 땐 당사자의 동의를 받은 사진인지 꼭 확인해주세요. 단점도 부드럽게, 상처 주지 않게 알려드려요.
+          </div>
+          <div class="notice-box" style="background:#eafaf0;color:#1e9e5a;">
+            📸 <b>지금 이 순간의 모습</b>을 찍어서 올려주시면, 오늘의 표정까지 읽어서 훨씬 더 자세하게 알려드려요!
+          </div>
+          <div class="file-drop" id="drop-zone">사진을 선택해주세요<br />(정면 얼굴이 잘 보이는 사진일수록 정확해요)</div>
+          <input type="file" id="file-input" accept="image/*" style="display:none" />
+          <img id="preview-img" />
+          <button class="pixel-btn" id="btn-analyze" disabled>족집게에게 보여주기</button>
+        </div>
+      </section>
+
+      <section id="step-loading" class="step">
+        <div class="pixel-box loading-box">
+          <img class="mascot-photo spin-anim" id="loading-mascot" src="images/mascot/dog.jpg" alt="분석 중" />
+          <p class="pixel-font">얼굴을 확인하고<br />관상을 읽는 중...</p>
+        </div>
+      </section>
+
+      <section id="step-error" class="step">
+        <div class="pixel-box" style="text-align:center;">
+          <div class="badge-error" id="error-message"></div>
+          <button class="pixel-btn alt" id="btn-error-retry">다른 사진으로 다시 시도</button>
+        </div>
+      </section>
+
+      <section id="step-free" class="step">
+        <div class="pixel-box" id="reveal-box">
+          <div class="transform-box">
+            <div class="sparkle-wrap">
+              <img class="mascot-photo reveal-photo" id="result-photo" src="" alt="결과" />
+            </div>
+            <span class="result-badge pixel-font" id="result-badge"></span>
+          </div>
+          <div class="daily-nuance" id="daily-nuance" style="display:none;"></div>
+          <div class="feature-item">
+            <div class="feature-label">👁 눈</div>
+            <p id="feat-eyes"></p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">✏️ 눈썹</div>
+            <p id="feat-eyebrows"></p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">🙂 오늘의 표정</div>
+            <p id="feat-expression"></p>
+          </div>
+          <div class="emotional-box" id="emotional-message"></div>
+        </div>
+      </section>
+
+      <section id="step-paid" class="step">
+        <div class="pixel-box">
+          <span class="badge-demo pixel-font" id="paid-source-badge"></span>
+          <div class="transform-box">
+            <img class="mascot-photo" id="result-photo-full" src="" alt="결과" />
+            <span class="result-badge pixel-font" id="result-badge-full"></span>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">👁 눈</div>
+            <p id="feat-eyes-full"></p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">✏️ 눈썹</div>
+            <p id="feat-eyebrows-full"></p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">🙂 오늘의 표정</div>
+            <p id="feat-expression-full"></p>
+          </div>
+          <div class="emotional-box" id="emotional-message-full"></div>
+          <div class="feature-item">
+            <div class="feature-label">👃 코</div>
+            <p id="feat-nose"></p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">👄 입</div>
+            <p id="feat-mouth"></p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">👂 귀</div>
+            <p id="feat-ears"></p>
+          </div>
+          <div class="feature-item">
+            <div class="feature-label">🧑 이마·턱선</div>
+            <p id="feat-foreheadjaw"></p>
+          </div>
+          <div class="subsection">
+            <div class="subsection-label pixel-font">🔮 전체 총평</div>
+            <p id="result-overall"></p>
+          </div>
+          <div class="subsection">
+            <div class="subsection-label pixel-font">✨ 핵심 장점</div>
+            <p id="result-strengths"></p>
+          </div>
+          <div class="subsection">
+            <div class="subsection-label pixel-font">🌱 보완하면 좋은 점</div>
+            <p id="result-cautions"></p>
+          </div>
+          <div class="subsection">
+            <div class="subsection-label pixel-font">💕 연애 스타일</div>
+            <p id="result-love"></p>
+          </div>
+          <div class="subsection">
+            <div class="subsection-label pixel-font">💼 직장/사회생활</div>
+            <p id="result-work"></p>
+          </div>
+          <div class="subsection">
+            <div class="subsection-label pixel-font">🍀 오늘의 럭키 아이템</div>
+            <p id="result-lucky"></p>
+          </div>
+          <div class="subsection compat-row">
+            <div>
+              <div class="subsection-label pixel-font">🤝 궁합 좋은 동물상</div>
+              <p id="result-compat"></p>
+            </div>
+            <img class="mascot-photo small" id="compat-photo" src="" alt="궁합 동물상" />
+          </div>
+        </div>
+
+        <div class="pixel-box" id="review-box">
+          <h2 class="section-title pixel-font">⭐ 리뷰 남기고 1회 더 무료 받기</h2>
+          <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">솔직한 별점+한줄평을 남기면 다음 이용 1회가 무료로 풀려요!</p>
+          <div class="star-rating" id="star-rating">
+            <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
+          </div>
+          <textarea id="review-text" placeholder="족집개 어땠어요? 솔직한 한줄평을 남겨주세요"></textarea>
+          <button class="pixel-btn" id="btn-review-submit">리뷰 남기고 무료 기회 받기</button>
+          <p class="badge-demo pixel-font" id="review-submitted-msg" style="display:none;">리뷰 감사해요! 다음 1회 무료 기회가 적립됐어요 🎁</p>
+        </div>
+
+        <div class="pixel-box">
+          <button class="pixel-btn alt" id="btn-restart">다른 사진으로 다시 보기</button>
+        </div>
+      </section>
+
+      <p class="disclaimer">본 콘텐츠는 재미로 즐기는 엔터테인먼트이며, 실제 성격·관상 진단이 아닙니다. 외모 자체를 평가하지 않고 성향·분위기 위주의 긍정적·건설적인 해석으로 구성돼요.</p>
+    </div>
+
+    <div class="bottom-fixed" id="unlock-bar" style="display:none;">
+      <div class="unlock-options">
+        <button class="pixel-btn ghost small" id="btn-share">📤 공유하고 무료로 보기</button>
+        <button class="pixel-btn small" id="btn-unlock">🪙 990원 결제하고 보기</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
