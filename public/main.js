@@ -225,12 +225,18 @@ document.getElementById('btn-error-retry').addEventListener('click', () => {
   showStep('upload');
 });
 
+function truncateTease(text, ratio = 0.5) {
+  if (!text) return text;
+  const cut = Math.max(10, Math.floor(text.length * ratio));
+  return text.slice(0, cut).trim() + '... 🔒';
+}
+
 function renderFreeResult(data, { showDailyNuance }) {
   document.getElementById('result-photo').src = data.photo;
   const badge = document.getElementById('result-badge');
   badge.textContent = `관상봐주시개 감정 결과: ${data.category}`;
   badge.style.background = data.color;
-  document.getElementById('feat-eyes').textContent = data.features.eyes;
+  document.getElementById('feat-eyes').textContent = truncateTease(data.features.eyes);
   document.getElementById('feat-eyebrows').textContent = data.features.eyebrows;
   document.getElementById('feat-expression').textContent = data.features.expression;
   document.getElementById('emotional-message').textContent = data.emotionalMessage || '';
