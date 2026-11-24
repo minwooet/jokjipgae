@@ -6,6 +6,7 @@ import { buildAiPrompt, findCategory, CATEGORIES, getDailyNuance } from './analy
 import { signSession, getSessionUserId } from './session.js';
 import { getAuthorizeUrl, exchangeCodeForToken, fetchKakaoProfile } from './kakao.js';
 import * as db from './db.js';
+import { confirmPayment } from './toss.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -294,6 +295,32 @@ async function handleKakaoCallback(req, res) {
   }
 }
 
+function handlePublicConfig(req, res) {
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ tossClientKey: process.env.TOSS_CLIENT_KEY || null }));
+}
+
+function handlePaymentConfirm(req, res) {
+  let body = '';
+  req.on('data', (chunk) => (body += chunk));
+  req.on('end', async () => {
+    try {
+      const { paymentKey, orderId, amount } = JSON.parse(body);
+      if (!paymentKey || !orderId || !amount) throw new Error('결제 정보가 올바르지 않습니다.');
+      const result = await confirmPayment(paymentKey, orderId, Number(amount));
+
+      const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
+      if (userId) await db.addBonusCredit(userId);
+
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ ok: true, status: result.status }));
+    } catch (err) {
+      res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+  });
+}
+
 function handleLogout(req, res) {
   res.writeHead(302, {
     Location: '/',
@@ -313,6 +340,8 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && reqUrl === '/api/auth/kakao/login') return handleKakaoLogin(req, res);
   if (req.method === 'GET' && reqUrl === '/api/auth/kakao/callback') return handleKakaoCallback(req, res);
   if (req.method === 'POST' && reqUrl === '/api/auth/logout') return handleLogout(req, res);
+  if (req.method === 'GET' && reqUrl === '/api/config') return handlePublicConfig(req, res);
+  if (req.method === 'POST' && reqUrl === '/api/payments/confirm') return handlePaymentConfirm(req, res);
 
   let reqPath = decodeURIComponent(reqUrl);
   if (reqPath === '/') reqPath = '/index.html';

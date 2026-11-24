@@ -1,7 +1,7 @@
 const FREE_TRIAL_KEY = 'faceReadingFreeTrialUsed';
 const BONUS_CREDIT_KEY = 'faceReadingBonusCredits';
 
-const state = { mode: 'self', base64: null, mediaType: null, basicResult: null, unlockedViaShare: false, selectedStars: 0 };
+const state = { mode: 'self', base64: null, mediaType: null, basicResult: null, unlockedViaShare: false, paidByToss: false, selectedStars: 0 };
 
 const steps = ['login', 'upload', 'loading', 'error', 'free', 'paid'];
 function showStep(name) {
@@ -208,6 +208,7 @@ async function runAnalysis() {
 
     state.basicResult = data;
     state.unlockedViaShare = false;
+    state.paidByToss = false;
 
     if (data.unlockLevel === 'full') {
       if (!authState.loggedIn) {
@@ -260,10 +261,74 @@ function renderFreeResult(data, { showDailyNuance }) {
   photo.classList.add('reveal-photo');
 }
 
+const PENDING_PAYMENT_KEY = 'faceReadingPendingPayment';
+const PAYMENT_AMOUNT = 490;
+let tossClientKey = null;
+fetch('/api/config')
+  .then((r) => r.json())
+  .then((d) => (tossClientKey = d.tossClientKey))
+  .catch(() => {});
+
 document.getElementById('btn-unlock').addEventListener('click', () => {
-  renderPaidResult(state.basicResult);
-  showStep('paid');
+  if (!tossClientKey || !window.TossPayments) {
+    alert('결제 기능이 아직 설정되지 않았어요.');
+    return;
+  }
+  const orderId = `order_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  localStorage.setItem(PENDING_PAYMENT_KEY, JSON.stringify({ orderId, result: state.basicResult }));
+
+  const tossPayments = TossPayments(tossClientKey);
+  tossPayments.requestPayment('카드', {
+    amount: PAYMENT_AMOUNT,
+    orderId,
+    orderName: `관상봐주시개 심화 리포트 (${state.basicResult.category})`,
+    successUrl: `${location.origin}/`,
+    failUrl: `${location.origin}/`,
+  });
 });
+
+async function checkPendingPaymentReturn() {
+  const params = new URLSearchParams(location.search);
+  const paymentKey = params.get('paymentKey');
+  const orderId = params.get('orderId');
+  const amount = params.get('amount');
+  const failCode = params.get('code');
+
+  if (failCode) {
+    history.replaceState({}, '', location.pathname);
+    alert('결제가 취소되었거나 실패했어요: ' + (params.get('message') || failCode));
+    return;
+  }
+  if (!paymentKey || !orderId || !amount) return;
+
+  history.replaceState({}, '', location.pathname);
+  const pendingRaw = localStorage.getItem(PENDING_PAYMENT_KEY);
+  const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+
+  try {
+    const res = await fetch('/api/payments/confirm', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ paymentKey, orderId, amount }),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    if (pending && pending.orderId === orderId) {
+      state.basicResult = pending.result;
+      state.unlockedViaShare = false;
+      state.paidByToss = true;
+      renderPaidResult(state.basicResult);
+      showStep('paid');
+    } else {
+      alert('결제는 완료됐지만 리포트 데이터를 못 찾았어요. 다시 분석해주세요.');
+    }
+    localStorage.removeItem(PENDING_PAYMENT_KEY);
+  } catch (err) {
+    alert('결제 승인 중 오류가 발생했어요: ' + err.message);
+  }
+}
+checkPendingPaymentReturn();
 
 document.getElementById('btn-share').addEventListener('click', async () => {
   const shareText = `나 오늘 관상 봤는데 "${state.basicResult.category}"래! 관상봐주시개가 봐주는 동물상 관상, 너도 한번 해봐 👉`;
@@ -285,7 +350,9 @@ document.getElementById('btn-share').addEventListener('click', async () => {
 });
 
 function renderPaidResult(data) {
-  document.getElementById('paid-source-badge').textContent = state.unlockedViaShare
+  document.getElementById('paid-source-badge').textContent = state.paidByToss
+    ? '💳 490원 결제 완료'
+    : state.unlockedViaShare
     ? '📤 공유/리뷰로 무료 열람'
     : data.source === 'ai'
     ? 'AI 관상 분석 · 데모 무료 공개'
@@ -321,6 +388,7 @@ function resetFlow() {
   state.mediaType = null;
   state.basicResult = null;
   state.unlockedViaShare = false;
+  state.paidByToss = false;
   previewImg.style.display = 'none';
   previewImg.src = '';
   fileInput.value = '';
