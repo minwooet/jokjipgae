@@ -3,13 +3,16 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { buildAiPrompt, findCategory, CATEGORIES, getDailyNuance } from './analysis.js';
+import { signSession, getSessionUserId } from './session.js';
+import { getAuthorizeUrl, exchangeCodeForToken, fetchKakaoProfile } from './kakao.js';
+import * as db from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const REVIEWS_FILE = path.join(__dirname, 'reviews.json');
 const PORT = process.env.PORT || 3002;
 
-function readReviews() {
+function readReviewsFile() {
   if (!fs.existsSync(REVIEWS_FILE)) return [];
   try {
     return JSON.parse(fs.readFileSync(REVIEWS_FILE, 'utf-8'));
@@ -18,7 +21,7 @@ function readReviews() {
   }
 }
 
-function writeReviews(reviews) {
+function writeReviewsFile(reviews) {
   fs.writeFileSync(REVIEWS_FILE, JSON.stringify(reviews, null, 1));
 }
 
@@ -48,6 +51,12 @@ const mimeTypes = {
   '.png': 'image/png',
   '.webp': 'image/webp',
 };
+
+function redirectUriFor(req) {
+  const host = req.headers.host;
+  const proto = req.headers['x-forwarded-proto'] || (host?.startsWith('localhost') ? 'http' : 'https');
+  return `${proto}://${host}/api/auth/kakao/callback`;
+}
 
 async function callClaudeVision(apiKey, imageBase64, mediaType, mode) {
   const prompt = buildAiPrompt(mode);
@@ -101,7 +110,7 @@ async function handleAnalyze(req, res) {
   req.on('end', async () => {
     try {
       const input = JSON.parse(body);
-      const { imageBase64, mediaType, mode } = input;
+      const { imageBase64, mediaType, mode, clientIsFirstUse, clientHasBonusCredit } = input;
       if (!imageBase64) throw new Error('이미지가 없습니다.');
 
       const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -124,9 +133,27 @@ async function handleAnalyze(req, res) {
       const cat = findCategory(parsed.category) || CATEGORIES[0];
       const compat = findCategory(parsed.compatibleWith) || CATEGORIES[1];
 
+      // ---- 무료/보너스 사용 여부 판단 ----
+      let unlockLevel = 'teaser';
+      const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
+
+      if (userId) {
+        const user = (await db.getUser(userId)) || (await db.upsertUser(userId, null));
+        if (!user.free_trial_used) {
+          unlockLevel = 'full';
+          await db.markFreeTrialUsed(userId);
+        } else if (user.bonus_credits > 0) {
+          unlockLevel = 'full';
+          await db.useBonusCredit(userId);
+        }
+      } else {
+        if (clientIsFirstUse || clientHasBonusCredit) unlockLevel = 'full';
+      }
+
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         faceDetected: true,
+        unlockLevel,
         category: cat.name,
         emoji: cat.emoji,
         color: cat.color,
@@ -151,8 +178,18 @@ async function handleAnalyze(req, res) {
   });
 }
 
-function handleGetReviews(req, res) {
-  const reviews = readReviews();
+async function handleGetReviews(req, res) {
+  if (db.isDbConfigured()) {
+    try {
+      const stats = await db.getReviewStats();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(stats));
+      return;
+    } catch (err) {
+      console.error('리뷰 조회 실패(DB):', err.message);
+    }
+  }
+  const reviews = readReviewsFile();
   const count = reviews.length;
   const avgRating = count ? reviews.reduce((sum, r) => sum + r.rating, 0) / count : 0;
   const recent = reviews.slice(-6).reverse().map((r) => ({ rating: r.rating, comment: r.comment }));
@@ -163,16 +200,24 @@ function handleGetReviews(req, res) {
 function handlePostReview(req, res) {
   let body = '';
   req.on('data', (chunk) => (body += chunk));
-  req.on('end', () => {
+  req.on('end', async () => {
     try {
       const { rating, comment } = JSON.parse(body);
       const r = Math.round(Number(rating));
       if (!(r >= 1 && r <= 5)) throw new Error('별점은 1~5 사이여야 해요.');
-      const reviews = readReviews();
-      reviews.push({ rating: r, comment: String(comment || '').slice(0, 300), createdAt: new Date().toISOString() });
-      writeReviews(reviews);
+      const cleanComment = String(comment || '').slice(0, 300);
+
+      const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
+      if (db.isDbConfigured()) {
+        await db.addReview(userId, r, cleanComment);
+        if (userId) await db.addBonusCredit(userId);
+      } else {
+        const reviews = readReviewsFile();
+        reviews.push({ rating: r, comment: cleanComment, createdAt: new Date().toISOString() });
+        writeReviewsFile(reviews);
+      }
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ ok: true }));
+      res.end(JSON.stringify({ ok: true, loggedIn: Boolean(userId) }));
     } catch (err) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ error: err.message }));
@@ -180,21 +225,75 @@ function handlePostReview(req, res) {
   });
 }
 
-const server = http.createServer((req, res) => {
-  if (req.method === 'POST' && req.url === '/api/analyze') {
-    handleAnalyze(req, res);
+async function handleAuthMe(req, res) {
+  const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
+  if (!userId) {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ loggedIn: false }));
     return;
   }
-  if (req.method === 'GET' && req.url === '/api/reviews') {
-    handleGetReviews(req, res);
-    return;
-  }
-  if (req.method === 'POST' && req.url === '/api/reviews') {
-    handlePostReview(req, res);
-    return;
-  }
+  const user = await db.getUser(userId);
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ loggedIn: true, nickname: user?.nickname, bonusCredits: user?.bonus_credits || 0 }));
+}
 
-  let reqPath = decodeURIComponent(req.url.split('?')[0]);
+function handleKakaoLogin(req, res) {
+  if (!process.env.KAKAO_REST_API_KEY) {
+    res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('카카오 로그인이 아직 설정되지 않았어요 (KAKAO_REST_API_KEY 없음)');
+    return;
+  }
+  const redirectUri = redirectUriFor(req);
+  res.writeHead(302, { Location: getAuthorizeUrl(redirectUri) });
+  res.end();
+}
+
+async function handleKakaoCallback(req, res) {
+  try {
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const code = url.searchParams.get('code');
+    if (!code) throw new Error('인가 코드가 없습니다.');
+
+    const redirectUri = redirectUriFor(req);
+    const tokenData = await exchangeCodeForToken(code, redirectUri);
+    const profile = await fetchKakaoProfile(tokenData.access_token);
+
+    if (db.isDbConfigured()) {
+      await db.upsertUser(profile.id, profile.nickname);
+    }
+
+    const sessionToken = signSession(profile.id);
+    res.writeHead(302, {
+      Location: '/',
+      'Set-Cookie': `session=${encodeURIComponent(sessionToken)}; HttpOnly; Path=/; Max-Age=${60 * 60 * 24 * 90}; SameSite=Lax`,
+    });
+    res.end();
+  } catch (err) {
+    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('카카오 로그인 실패: ' + err.message);
+  }
+}
+
+function handleLogout(req, res) {
+  res.writeHead(302, {
+    Location: '/',
+    'Set-Cookie': 'session=; HttpOnly; Path=/; Max-Age=0',
+  });
+  res.end();
+}
+
+const server = http.createServer((req, res) => {
+  const reqUrl = req.url.split('?')[0];
+
+  if (req.method === 'POST' && reqUrl === '/api/analyze') return handleAnalyze(req, res);
+  if (req.method === 'GET' && reqUrl === '/api/reviews') return handleGetReviews(req, res);
+  if (req.method === 'POST' && reqUrl === '/api/reviews') return handlePostReview(req, res);
+  if (req.method === 'GET' && reqUrl === '/api/auth/me') return handleAuthMe(req, res);
+  if (req.method === 'GET' && reqUrl === '/api/auth/kakao/login') return handleKakaoLogin(req, res);
+  if (req.method === 'GET' && reqUrl === '/api/auth/kakao/callback') return handleKakaoCallback(req, res);
+  if (req.method === 'POST' && reqUrl === '/api/auth/logout') return handleLogout(req, res);
+
+  let reqPath = decodeURIComponent(reqUrl);
   if (reqPath === '/') reqPath = '/index.html';
   const filePath = path.join(PUBLIC_DIR, reqPath);
 
@@ -219,4 +318,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, () => {
   console.log(`SERVER_ONLINE:${PORT}`);
   console.log(process.env.ANTHROPIC_API_KEY ? 'AI 비전 분석 모드 (ANTHROPIC_API_KEY 감지됨)' : '경고: API 키 없음 - 분석 요청시 503 반환됨');
+  console.log(db.isDbConfigured() ? 'Supabase DB 연결됨' : '경고: Supabase 미설정 - 로컬 파일/쿠키로 폴백');
+  console.log(process.env.KAKAO_REST_API_KEY ? '카카오 로그인 활성화됨' : '카카오 로그인 미설정');
 });

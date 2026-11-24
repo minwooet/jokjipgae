@@ -43,6 +43,33 @@ async function loadSocialProof() {
 }
 loadSocialProof();
 
+// ---- 로그인 상태 ----
+let authState = { loggedIn: false };
+async function loadAuthState() {
+  try {
+    const res = await fetch('/api/auth/me');
+    authState = await res.json();
+    const loginBtn = document.getElementById('btn-kakao-login');
+    const userChip = document.getElementById('user-chip');
+    if (authState.loggedIn) {
+      loginBtn.style.display = 'none';
+      userChip.style.display = 'inline-block';
+      userChip.textContent = `👋 ${authState.nickname || '회원'}님 (로그아웃)`;
+    } else {
+      loginBtn.style.display = 'inline-block';
+      userChip.style.display = 'none';
+    }
+  } catch (e) {
+    // 조용히 무시
+  }
+}
+loadAuthState();
+
+document.getElementById('user-chip').addEventListener('click', async () => {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  location.reload();
+});
+
 // ---- 모드 토글 ----
 const modeSelfBtn = document.getElementById('mode-self');
 const modeOtherBtn = document.getElementById('mode-other');
@@ -91,11 +118,20 @@ async function runAnalysis() {
   if (!state.base64) return;
   showStep('loading');
 
+  const clientIsFirstUse = isFirstEverUse();
+  const clientHasBonusCredit = getBonusCredits() > 0;
+
   try {
     const res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ imageBase64: state.base64, mediaType: state.mediaType, mode: state.mode }),
+      body: JSON.stringify({
+        imageBase64: state.base64,
+        mediaType: state.mediaType,
+        mode: state.mode,
+        clientIsFirstUse,
+        clientHasBonusCredit,
+      }),
     });
     const data = await res.json();
 
@@ -111,14 +147,12 @@ async function runAnalysis() {
     state.basicResult = data;
     state.unlockedViaShare = false;
 
-    if (isFirstEverUse()) {
-      localStorage.setItem(FREE_TRIAL_KEY, 'true');
-      renderFreeResult(data, { showDailyNuance: false });
-      renderPaidResult(data);
-      showStep('paid');
-    } else if (getBonusCredits() > 0) {
-      useBonusCredit();
-      state.unlockedViaShare = true;
+    if (data.unlockLevel === 'full') {
+      if (!authState.loggedIn) {
+        if (clientIsFirstUse) localStorage.setItem(FREE_TRIAL_KEY, 'true');
+        else if (clientHasBonusCredit) useBonusCredit();
+      }
+      state.unlockedViaShare = !clientIsFirstUse;
       renderFreeResult(data, { showDailyNuance: false });
       renderPaidResult(data);
       showStep('paid');
@@ -256,12 +290,13 @@ document.getElementById('btn-review-submit').addEventListener('click', async () 
   }
   const comment = document.getElementById('review-text').value.trim();
   try {
-    await fetch('/api/reviews', {
+    const res = await fetch('/api/reviews', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ rating: state.selectedStars, comment }),
     });
-    addBonusCredit();
+    const result = await res.json();
+    if (!result.loggedIn) addBonusCredit();
     document.getElementById('review-submitted-msg').style.display = 'block';
     document.getElementById('btn-review-submit').disabled = true;
     loadSocialProof();

@@ -46,6 +46,17 @@ html, body {
 .app-bar .logo-dot { font-size: 20px; }
 .app-bar .logo-text { font-size: 13px; }
 
+.auth-chip {
+  font-size: 10.5px;
+  background: var(--yellow);
+  border: 2px solid var(--line);
+  padding: 5px 10px;
+  text-decoration: none;
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* ---- 픽셀 박스: 각진 모서리 + 두꺼운 테두리 + 하드 섀도우 ---- */
 .pixel-box {
   background: var(--card);
