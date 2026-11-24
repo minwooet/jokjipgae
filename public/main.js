@@ -62,6 +62,14 @@ function spawnFlyingReviews(recent) {
   flyRotateTimer = setInterval(renderFlyingBatch, FLY_ROTATE_INTERVAL_MS);
 }
 
+// 네 방향 대각선: [시작 top%, 시작 left%, 끝 top%, 끝 left%]
+const FLY_DIRECTIONS = [
+  [-15, -70, 115, 100],
+  [-15, 100, 115, -70],
+  [115, -70, -15, 100],
+  [115, 100, -15, -70],
+];
+
 function renderFlyingBatch() {
   const layer = document.getElementById('review-fly-layer');
   layer.innerHTML = '';
@@ -73,10 +81,21 @@ function renderFlyingBatch() {
     el.className = 'review-fly-item';
     const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
     el.textContent = `${stars} ${r.comment || ''}`.trim();
-    el.style.animationDuration = '26s';
-    el.style.animationDelay = `${i * 3.5}s`;
-    el.style.top = `${5 + i * 25}%`;
+
+    const [startTop, startLeft, endTop, endLeft] = FLY_DIRECTIONS[Math.floor(Math.random() * FLY_DIRECTIONS.length)];
+    const rotate = Math.random() > 0.5 ? -12 : 12;
+    el.style.opacity = '0';
     layer.appendChild(el);
+
+    el.animate(
+      [
+        { top: `${startTop}%`, left: `${startLeft}%`, transform: `rotate(${rotate}deg)`, opacity: 0 },
+        { offset: 0.08, opacity: 0.5 },
+        { offset: 0.92, opacity: 0.5 },
+        { top: `${endTop}%`, left: `${endLeft}%`, transform: `rotate(${rotate}deg)`, opacity: 0 },
+      ],
+      { duration: 28000, delay: i * 3500, easing: 'linear', iterations: Infinity }
+    );
   });
 }
 

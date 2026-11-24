@@ -357,9 +357,7 @@ html, body {
 }
 .review-fly-item {
   position: absolute;
-  top: -40px;
-  left: -85%;
-  max-width: 70%;
+  max-width: 65%;
   background: var(--card);
   border: 2px solid var(--line);
   box-shadow: 2px 2px 0 var(--line);
@@ -368,16 +366,6 @@ html, body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  opacity: 0.5;
-  animation-name: fly-diagonal;
-  animation-timing-function: linear;
-  animation-fill-mode: forwards;
-}
-@keyframes fly-diagonal {
-  0% { transform: translate(0, 0) rotate(-12deg); opacity: 0; }
-  8% { opacity: 0.5; }
-  92% { opacity: 0.5; }
-  100% { transform: translate(230%, 2400%) rotate(-12deg); opacity: 0; }
 }
 
 .hero, .container { position: relative; z-index: 1; }
