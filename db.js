@@ -41,32 +41,25 @@ export async function upsertUser(userId, nickname) {
   return rows[0];
 }
 
-export async function markFreeTrialUsed(userId) {
-  await fetch(restUrl(`app_users?id=eq.${encodeURIComponent(userId)}`), {
-    method: 'PATCH',
-    headers: headers(),
-    body: JSON.stringify({ free_trial_used: true }),
-  });
-}
-
-export async function addBonusCredit(userId) {
+export async function consumeToken(userId) {
   const user = await getUser(userId);
-  const current = user?.bonus_credits || 0;
-  await fetch(restUrl(`app_users?id=eq.${encodeURIComponent(userId)}`), {
-    method: 'PATCH',
-    headers: headers(),
-    body: JSON.stringify({ bonus_credits: current + 1 }),
-  });
-}
-
-export async function useBonusCredit(userId) {
-  const user = await getUser(userId);
-  const current = user?.bonus_credits || 0;
+  const current = user?.tokens ?? 0;
   if (current <= 0) return false;
   await fetch(restUrl(`app_users?id=eq.${encodeURIComponent(userId)}`), {
     method: 'PATCH',
     headers: headers(),
-    body: JSON.stringify({ bonus_credits: current - 1 }),
+    body: JSON.stringify({ tokens: current - 1 }),
+  });
+  return true;
+}
+
+export async function grantShareBonus(userId) {
+  const user = await getUser(userId);
+  if (!user || user.share_bonus_used) return false;
+  await fetch(restUrl(`app_users?id=eq.${encodeURIComponent(userId)}`), {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify({ tokens: (user.tokens ?? 0) + 1, share_bonus_used: true }),
   });
   return true;
 }

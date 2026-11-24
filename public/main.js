@@ -1,5 +1,4 @@
 const FREE_TRIAL_KEY = 'faceReadingFreeTrialUsed';
-const BONUS_CREDIT_KEY = 'faceReadingBonusCredits';
 
 const state = { mode: 'self', base64: null, mediaType: null, basicResult: null, unlockedViaShare: false, paidByToss: false, selectedStars: 0 };
 
@@ -13,17 +12,6 @@ function showStep(name) {
 
 function isFirstEverUse() {
   return localStorage.getItem(FREE_TRIAL_KEY) !== 'true';
-}
-
-function getBonusCredits() {
-  return parseInt(localStorage.getItem(BONUS_CREDIT_KEY) || '0', 10);
-}
-function useBonusCredit() {
-  const n = getBonusCredits();
-  if (n > 0) localStorage.setItem(BONUS_CREDIT_KEY, String(n - 1));
-}
-function addBonusCredit() {
-  localStorage.setItem(BONUS_CREDIT_KEY, String(getBonusCredits() + 1));
 }
 
 // ---- 사회적 증거(실제 리뷰 + 방문자 수) ----
@@ -112,6 +100,11 @@ async function loadAuthState() {
       userChip.style.display = 'inline-block';
       userChip.textContent = `👋 ${authState.nickname || '회원'}님 (로그아웃)`;
       if (document.getElementById('step-login').classList.contains('active')) showStep('upload');
+      const shareBtn = document.getElementById('btn-share');
+      if (authState.shareBonusUsed) {
+        shareBtn.disabled = true;
+        shareBtn.textContent = '📤 공유 보너스 이미 받음';
+      }
     } else {
       loginBtn.style.display = 'inline-block';
       userChip.style.display = 'none';
@@ -177,7 +170,6 @@ async function runAnalysis() {
   showStep('loading');
 
   const clientIsFirstUse = isFirstEverUse();
-  const clientHasBonusCredit = getBonusCredits() > 0;
 
   try {
     const res = await fetch('/api/analyze', {
@@ -188,7 +180,6 @@ async function runAnalysis() {
         mediaType: state.mediaType,
         mode: state.mode,
         clientIsFirstUse,
-        clientHasBonusCredit,
       }),
     });
     const data = await res.json();
@@ -211,11 +202,8 @@ async function runAnalysis() {
     state.paidByToss = false;
 
     if (data.unlockLevel === 'full') {
-      if (!authState.loggedIn) {
-        if (clientIsFirstUse) localStorage.setItem(FREE_TRIAL_KEY, 'true');
-        else if (clientHasBonusCredit) useBonusCredit();
-      }
-      state.unlockedViaShare = !clientIsFirstUse;
+      if (!authState.loggedIn && clientIsFirstUse) localStorage.setItem(FREE_TRIAL_KEY, 'true');
+      state.unlockedViaShare = authState.loggedIn && !clientIsFirstUse;
       renderFreeResult(data, { showDailyNuance: false });
       renderPaidResult(data);
       showStep('paid');
@@ -266,7 +254,12 @@ const PAYMENT_AMOUNT = 490;
 let tossClientKey = null;
 fetch('/api/config')
   .then((r) => r.json())
-  .then((d) => (tossClientKey = d.tossClientKey))
+  .then((d) => {
+    tossClientKey = d.tossClientKey;
+    if (d.kakaoJsKey && window.Kakao && !Kakao.isInitialized()) {
+      Kakao.init(d.kakaoJsKey);
+    }
+  })
   .catch(() => {});
 
 document.getElementById('btn-unlock').addEventListener('click', () => {
@@ -331,21 +324,45 @@ async function checkPendingPaymentReturn() {
 checkPendingPaymentReturn();
 
 document.getElementById('btn-share').addEventListener('click', async () => {
-  const shareText = `나 오늘 관상 봤는데 "${state.basicResult.category}"래! 관상봐주시개가 봐주는 동물상 관상, 너도 한번 해봐 👉`;
+  if (!authState.loggedIn) {
+    showStep('login');
+    return;
+  }
+  if (authState.shareBonusUsed) {
+    alert('공유 보너스는 계정당 한 번만 받을 수 있어요. 이미 사용하셨어요!');
+    return;
+  }
+
   const shareUrl = location.origin;
+  if (window.Kakao && Kakao.isInitialized()) {
+    Kakao.Share.sendDefault({
+      objectType: 'feed',
+      content: {
+        title: `나 오늘 관상 봤는데 "${state.basicResult.category}"래!`,
+        description: '관상봐주시개가 봐주는 오늘의 동물상 관상, 너도 한번 해봐',
+        imageUrl: `${location.origin}/${state.basicResult.photo}`,
+        link: { webUrl: shareUrl, mobileWebUrl: shareUrl },
+      },
+      buttons: [{ title: '나도 관상보기', link: { webUrl: shareUrl, mobileWebUrl: shareUrl } }],
+    });
+  } else {
+    await navigator.clipboard.writeText(`나 오늘 관상 봤는데 "${state.basicResult.category}"래! ${shareUrl}`);
+    alert('공유 문구가 클립보드에 복사됐어요!');
+  }
 
   try {
-    if (navigator.share) {
-      await navigator.share({ title: '관상봐주시개 - 오늘의 동물상 관상', text: shareText, url: shareUrl });
+    const res = await fetch('/api/share-bonus', { method: 'POST' });
+    const data = await res.json();
+    if (data.granted) {
+      authState.shareBonusUsed = true;
+      state.unlockedViaShare = true;
+      renderPaidResult(state.basicResult);
+      showStep('paid');
     } else {
-      await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-      alert('공유 문구가 클립보드에 복사됐어요! 카카오톡에 붙여넣어 친구에게 공유해보세요 📋');
+      alert('공유 보너스는 이미 받으셨어요.');
     }
-    state.unlockedViaShare = true;
-    renderPaidResult(state.basicResult);
-    showStep('paid');
   } catch (err) {
-    // 사용자가 공유를 취소한 경우는 조용히 무시
+    alert('공유 보너스 처리 중 오류가 발생했어요.');
   }
 });
 
@@ -353,7 +370,7 @@ function renderPaidResult(data) {
   document.getElementById('paid-source-badge').textContent = state.paidByToss
     ? '💳 490원 결제 완료'
     : state.unlockedViaShare
-    ? '📤 공유/리뷰로 무료 열람'
+    ? '📤 공유 보너스로 무료 열람'
     : data.source === 'ai'
     ? 'AI 관상 분석 · 데모 무료 공개'
     : '데모 무료 공개';
@@ -425,8 +442,7 @@ document.getElementById('btn-review-submit').addEventListener('click', async () 
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ rating: state.selectedStars, comment }),
     });
-    const result = await res.json();
-    if (!result.loggedIn) addBonusCredit();
+    await res.json();
     document.getElementById('review-submitted-msg').style.display = 'block';
     document.getElementById('btn-review-submit').disabled = true;
     loadSocialProof();

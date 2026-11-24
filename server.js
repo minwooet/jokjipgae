@@ -141,20 +141,15 @@ async function handleAnalyze(req, res) {
       const cat = findCategory(parsed.category) || CATEGORIES[0];
       const compat = findCategory(parsed.compatibleWith) || CATEGORIES[1];
 
-      // ---- 무료/보너스 사용 여부 판단 ----
+      // ---- 토큰 보유 여부 판단 ----
       let unlockLevel = 'teaser';
 
       if (userId) {
-        const user = (await db.getUser(userId)) || (await db.upsertUser(userId, null));
-        if (!user.free_trial_used) {
-          unlockLevel = 'full';
-          await db.markFreeTrialUsed(userId);
-        } else if (user.bonus_credits > 0) {
-          unlockLevel = 'full';
-          await db.useBonusCredit(userId);
-        }
+        await db.getUser(userId) || (await db.upsertUser(userId, null));
+        const consumed = await db.consumeToken(userId);
+        if (consumed) unlockLevel = 'full';
       } else {
-        if (clientIsFirstUse || clientHasBonusCredit) unlockLevel = 'full';
+        if (clientIsFirstUse) unlockLevel = 'full';
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -231,7 +226,6 @@ function handlePostReview(req, res) {
       const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
       if (db.isDbConfigured()) {
         await db.addReview(userId, r, cleanComment);
-        if (userId) await db.addBonusCredit(userId);
       } else {
         const reviews = readReviewsFile();
         reviews.push({ rating: r, comment: cleanComment, createdAt: new Date().toISOString() });
@@ -246,6 +240,18 @@ function handlePostReview(req, res) {
   });
 }
 
+async function handleShareBonus(req, res) {
+  const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
+  if (!userId) {
+    res.writeHead(401, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: 'LOGIN_REQUIRED' }));
+    return;
+  }
+  const granted = await db.grantShareBonus(userId);
+  res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+  res.end(JSON.stringify({ granted }));
+}
+
 async function handleAuthMe(req, res) {
   const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
   if (!userId) {
@@ -255,7 +261,12 @@ async function handleAuthMe(req, res) {
   }
   const user = await db.getUser(userId);
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ loggedIn: true, nickname: user?.nickname, bonusCredits: user?.bonus_credits || 0 }));
+  res.end(JSON.stringify({
+    loggedIn: true,
+    nickname: user?.nickname,
+    tokens: user?.tokens ?? 0,
+    shareBonusUsed: Boolean(user?.share_bonus_used),
+  }));
 }
 
 function handleKakaoLogin(req, res) {
@@ -297,7 +308,10 @@ async function handleKakaoCallback(req, res) {
 
 function handlePublicConfig(req, res) {
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-  res.end(JSON.stringify({ tossClientKey: process.env.TOSS_CLIENT_KEY || null }));
+  res.end(JSON.stringify({
+    tossClientKey: process.env.TOSS_CLIENT_KEY || null,
+    kakaoJsKey: process.env.KAKAO_JS_KEY || null,
+  }));
 }
 
 function handlePaymentConfirm(req, res) {
@@ -308,9 +322,6 @@ function handlePaymentConfirm(req, res) {
       const { paymentKey, orderId, amount } = JSON.parse(body);
       if (!paymentKey || !orderId || !amount) throw new Error('결제 정보가 올바르지 않습니다.');
       const result = await confirmPayment(paymentKey, orderId, Number(amount));
-
-      const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
-      if (userId) await db.addBonusCredit(userId);
 
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ ok: true, status: result.status }));
@@ -336,6 +347,7 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && reqUrl === '/api/reviews') return handleGetReviews(req, res);
   if (req.method === 'POST' && reqUrl === '/api/visit') return handleVisit(req, res);
   if (req.method === 'POST' && reqUrl === '/api/reviews') return handlePostReview(req, res);
+  if (req.method === 'POST' && reqUrl === '/api/share-bonus') return handleShareBonus(req, res);
   if (req.method === 'GET' && reqUrl === '/api/auth/me') return handleAuthMe(req, res);
   if (req.method === 'GET' && reqUrl === '/api/auth/kakao/login') return handleKakaoLogin(req, res);
   if (req.method === 'GET' && reqUrl === '/api/auth/kakao/callback') return handleKakaoCallback(req, res);

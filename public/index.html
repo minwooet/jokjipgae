@@ -6,6 +6,7 @@
   <title>관상봐주시개 - 오늘의 동물상 관상</title>
   <link rel="stylesheet" href="style.css" />
   <script src="https://js.tosspayments.com/v1/payment"></script>
+  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.4/kakao.min.js"></script>
 </head>
 <body>
   <div class="app-frame">
@@ -166,14 +167,14 @@
         </div>
 
         <div class="pixel-box" id="review-box">
-          <h2 class="section-title pixel-font">⭐ 리뷰 남기고 1회 더 무료 받기</h2>
-          <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">솔직한 별점+한줄평을 남기면 다음 이용 1회가 무료로 풀려요!</p>
+          <h2 class="section-title pixel-font">⭐ 솔직한 리뷰 남기기</h2>
+          <p style="font-size:12px;color:var(--muted);margin:0 0 10px;">별점+한줄평을 남겨주시면 서비스 개선에 큰 도움이 돼요!</p>
           <div class="star-rating" id="star-rating">
             <span data-v="1">★</span><span data-v="2">★</span><span data-v="3">★</span><span data-v="4">★</span><span data-v="5">★</span>
           </div>
           <textarea id="review-text" placeholder="관상봐주시개 어땠어요? 솔직한 한줄평을 남겨주세요"></textarea>
-          <button class="pixel-btn" id="btn-review-submit">리뷰 남기고 무료 기회 받기</button>
-          <p class="badge-demo pixel-font" id="review-submitted-msg" style="display:none;">리뷰 감사해요! 다음 1회 무료 기회가 적립됐어요 🎁</p>
+          <button class="pixel-btn" id="btn-review-submit">리뷰 남기기</button>
+          <p class="badge-demo pixel-font" id="review-submitted-msg" style="display:none;">리뷰 감사해요! 🙏</p>
         </div>
 
         <div class="pixel-box">
@@ -186,7 +187,7 @@
 
     <div class="bottom-fixed" id="unlock-bar" style="display:none;">
       <div class="unlock-options">
-        <button class="pixel-btn ghost small" id="btn-share">📤 공유하고 무료로 보기</button>
+        <button class="pixel-btn ghost small" id="btn-share">📤 카톡 공유하고 토큰받기(최초 1회)</button>
         <button class="pixel-btn small" id="btn-unlock">🪙 490원 결제하고 보기</button>
       </div>
     </div>
