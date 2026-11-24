@@ -46,18 +46,36 @@ async function loadSocialProof() {
 loadSocialProof();
 fetch('/api/visit', { method: 'POST' }).catch(() => {});
 
+const FLY_MAX_VISIBLE = 3;
+const FLY_ROTATE_INTERVAL_MS = 12000;
+let flyRotateTimer = null;
+let flyReviewPool = [];
+
 function spawnFlyingReviews(recent) {
+  flyReviewPool = recent;
+  clearInterval(flyRotateTimer);
+  if (!recent.length) {
+    document.getElementById('review-fly-layer').innerHTML = '';
+    return;
+  }
+  renderFlyingBatch();
+  flyRotateTimer = setInterval(renderFlyingBatch, FLY_ROTATE_INTERVAL_MS);
+}
+
+function renderFlyingBatch() {
   const layer = document.getElementById('review-fly-layer');
   layer.innerHTML = '';
-  if (!recent.length) return;
-  recent.forEach((r, i) => {
+  const shuffled = [...flyReviewPool].sort(() => Math.random() - 0.5);
+  const picked = shuffled.slice(0, Math.min(FLY_MAX_VISIBLE, shuffled.length));
+
+  picked.forEach((r, i) => {
     const el = document.createElement('div');
     el.className = 'review-fly-item';
     const stars = '★'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
     el.textContent = `${stars} ${r.comment || ''}`.trim();
-    el.style.animationDuration = `${14 + i * 2}s`;
-    el.style.animationDelay = `${i * 2.3}s`;
-    el.style.top = `${-10 - i * 5}%`;
+    el.style.animationDuration = '26s';
+    el.style.animationDelay = `${i * 3.5}s`;
+    el.style.top = `${5 + i * 25}%`;
     layer.appendChild(el);
   });
 }

@@ -30,6 +30,7 @@ html, body {
   background: var(--bg);
   position: relative;
   padding-bottom: 90px;
+  overflow: hidden;
 }
 
 .app-bar {
@@ -41,6 +42,7 @@ html, body {
   border-bottom: 3px solid var(--line);
   position: sticky;
   top: 0;
+  z-index: 2;
   z-index: 10;
 }
 .app-bar .logo-dot { font-size: 20px; }
@@ -347,7 +349,7 @@ html, body {
 }
 
 .review-fly-layer {
-  position: fixed;
+  position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
@@ -355,25 +357,30 @@ html, body {
 }
 .review-fly-item {
   position: absolute;
-  top: -60px;
-  left: -300px;
+  top: -40px;
+  left: -85%;
+  max-width: 70%;
   background: var(--card);
   border: 2px solid var(--line);
   box-shadow: 2px 2px 0 var(--line);
   padding: 6px 12px;
-  font-size: 11px;
+  font-size: 10.5px;
   white-space: nowrap;
-  opacity: 0.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.5;
   animation-name: fly-diagonal;
   animation-timing-function: linear;
-  animation-iteration-count: infinite;
+  animation-fill-mode: forwards;
 }
 @keyframes fly-diagonal {
-  0% { transform: translate(0, 0) rotate(-12deg); }
-  100% { transform: translate(140vw, 160vh) rotate(-12deg); }
+  0% { transform: translate(0, 0) rotate(-12deg); opacity: 0; }
+  8% { opacity: 0.5; }
+  92% { opacity: 0.5; }
+  100% { transform: translate(230%, 2400%) rotate(-12deg); opacity: 0; }
 }
 
-.app-frame, .hero, .container { position: relative; z-index: 1; }
+.hero, .container { position: relative; z-index: 1; }
 
 .disclaimer {
   font-size: 10.5px;
