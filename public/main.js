@@ -239,7 +239,7 @@ document.getElementById('btn-error-retry').addEventListener('click', () => {
 function renderFreeResult(data, { showDailyNuance }) {
   document.getElementById('result-photo').src = data.photo;
   const badge = document.getElementById('result-badge');
-  badge.textContent = `족집개 감정 결과: ${data.category}`;
+  badge.textContent = `관상봐주시개 감정 결과: ${data.category}`;
   badge.style.background = data.color;
   document.getElementById('feat-eyes').textContent = data.features.eyes;
   document.getElementById('feat-eyebrows').textContent = data.features.eyebrows;
@@ -266,12 +266,12 @@ document.getElementById('btn-unlock').addEventListener('click', () => {
 });
 
 document.getElementById('btn-share').addEventListener('click', async () => {
-  const shareText = `나 오늘 관상 봤는데 "${state.basicResult.category}"래! 족집개가 봐주는 동물상 관상, 너도 한번 해봐 👉`;
+  const shareText = `나 오늘 관상 봤는데 "${state.basicResult.category}"래! 관상봐주시개가 봐주는 동물상 관상, 너도 한번 해봐 👉`;
   const shareUrl = location.origin;
 
   try {
     if (navigator.share) {
-      await navigator.share({ title: '족집개 - 오늘의 동물상 관상', text: shareText, url: shareUrl });
+      await navigator.share({ title: '관상봐주시개 - 오늘의 동물상 관상', text: shareText, url: shareUrl });
     } else {
       await navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
       alert('공유 문구가 클립보드에 복사됐어요! 카카오톡에 붙여넣어 친구에게 공유해보세요 📋');
@@ -293,7 +293,7 @@ function renderPaidResult(data) {
 
   document.getElementById('result-photo-full').src = data.photo;
   const badgeFull = document.getElementById('result-badge-full');
-  badgeFull.textContent = `족집개 감정 결과: ${data.category}`;
+  badgeFull.textContent = `관상봐주시개 감정 결과: ${data.category}`;
   badgeFull.style.background = data.color;
   document.getElementById('feat-eyes-full').textContent = data.features.eyes;
   document.getElementById('feat-eyebrows-full').textContent = data.features.eyebrows;

@@ -34,6 +34,6 @@ export async function fetchKakaoProfile(accessToken) {
   const data = await res.json();
   return {
     id: String(data.id),
-    nickname: data.kakao_account?.profile?.nickname || data.properties?.nickname || '족집개 회원',
+    nickname: data.kakao_account?.profile?.nickname || data.properties?.nickname || '관상봐주시개 회원',
   };
 }
