@@ -14,6 +14,9 @@ export async function exchangeCodeForToken(code, redirectUri) {
     redirect_uri: redirectUri,
     code,
   });
+  if (process.env.KAKAO_CLIENT_SECRET) {
+    params.set('client_secret', process.env.KAKAO_CLIENT_SECRET);
+  }
   const res = await fetch('https://kauth.kakao.com/oauth/token', {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded;charset=utf-8' },
