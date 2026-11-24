@@ -349,8 +349,12 @@ html, body {
 }
 
 .review-fly-layer {
-  position: absolute;
-  inset: 0;
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(430px, 100vw);
+  height: 100vh;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
