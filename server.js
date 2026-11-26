@@ -111,7 +111,7 @@ async function handleAnalyze(req, res) {
   req.on('end', async () => {
     try {
       const input = JSON.parse(body);
-      const { imageBase64, mediaType, mode, clientIsFirstUse, clientHasBonusCredit } = input;
+      const { imageBase64, mediaType, mode } = input;
       if (!imageBase64) throw new Error('이미지가 없습니다.');
 
       const userId = db.isDbConfigured() ? getSessionUserId(req) : null;
@@ -141,16 +141,13 @@ async function handleAnalyze(req, res) {
       const cat = findCategory(parsed.category) || CATEGORIES[0];
       const compat = findCategory(parsed.compatibleWith) || CATEGORIES[1];
 
-      // ---- 토큰 보유 여부 판단 ----
-      let unlockLevel = 'teaser';
-
+      // ---- 전체 무료 공개 (결제/토큰 게이트 비활성화) ----
+      // 토큰·결제 관련 함수(db.consumeToken, /api/payments/confirm 등)는
+      // 나중에 유료 전환 시 바로 쓸 수 있도록 코드는 남겨두고 호출만 안 함.
       if (userId) {
         await db.getUser(userId) || (await db.upsertUser(userId, null));
-        const consumed = await db.consumeToken(userId);
-        if (consumed) unlockLevel = 'full';
-      } else {
-        if (clientIsFirstUse) unlockLevel = 'full';
       }
+      const unlockLevel = 'full';
 
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({

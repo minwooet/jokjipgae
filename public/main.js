@@ -2,12 +2,11 @@ const FREE_TRIAL_KEY = 'faceReadingFreeTrialUsed';
 
 const state = { mode: 'self', base64: null, mediaType: null, basicResult: null, unlockedViaShare: false, paidByToss: false, selectedStars: 0 };
 
-const steps = ['login', 'upload', 'loading', 'error', 'free', 'paid'];
+const steps = ['login', 'upload', 'loading', 'error', 'paid'];
 function showStep(name) {
   for (const s of steps) {
     document.getElementById(`step-${s}`).classList.toggle('active', s === name);
   }
-  document.getElementById('unlock-bar').style.display = name === 'free' ? 'block' : 'none';
 }
 
 function isFirstEverUse() {
@@ -100,11 +99,6 @@ async function loadAuthState() {
       userChip.style.display = 'inline-block';
       userChip.textContent = `👋 ${authState.nickname || '회원'}님 (로그아웃)`;
       if (document.getElementById('step-login').classList.contains('active')) showStep('upload');
-      const shareBtn = document.getElementById('btn-share');
-      if (authState.shareBonusUsed) {
-        shareBtn.disabled = true;
-        shareBtn.textContent = '📤 공유 보너스 이미 받음';
-      }
     } else {
       loginBtn.style.display = 'inline-block';
       userChip.style.display = 'none';
@@ -201,16 +195,9 @@ async function runAnalysis() {
     state.unlockedViaShare = false;
     state.paidByToss = false;
 
-    if (data.unlockLevel === 'full') {
-      if (!authState.loggedIn && clientIsFirstUse) localStorage.setItem(FREE_TRIAL_KEY, 'true');
-      state.unlockedViaShare = authState.loggedIn && !clientIsFirstUse;
-      renderFreeResult(data, { showDailyNuance: false });
-      renderPaidResult(data);
-      showStep('paid');
-    } else {
-      renderFreeResult(data, { showDailyNuance: true });
-      showStep('free');
-    }
+    // 지금은 전부 무료 공개 (결제/공유 게이트 비활성화)
+    renderPaidResult(data);
+    showStep('paid');
   } catch (err) {
     showError('분석 중 오류가 발생했어요: ' + err.message);
   }
@@ -225,36 +212,6 @@ document.getElementById('btn-error-retry').addEventListener('click', () => {
   showStep('upload');
 });
 
-function truncateTease(text, ratio = 0.5) {
-  if (!text) return text;
-  const cut = Math.max(10, Math.floor(text.length * ratio));
-  return text.slice(0, cut).trim() + '... 🔒';
-}
-
-function renderFreeResult(data, { showDailyNuance }) {
-  document.getElementById('result-photo').src = data.photo;
-  const badge = document.getElementById('result-badge');
-  badge.textContent = `관상봐주시개 감정 결과: ${data.category}`;
-  badge.style.background = data.color;
-  document.getElementById('feat-eyes').textContent = truncateTease(data.features.eyes);
-  document.getElementById('feat-eyebrows').textContent = data.features.eyebrows;
-  document.getElementById('feat-expression').textContent = data.features.expression;
-  document.getElementById('emotional-message').textContent = data.emotionalMessage || '';
-
-  const nuanceBox = document.getElementById('daily-nuance');
-  if (showDailyNuance && data.dailyNuance) {
-    nuanceBox.textContent = `🔮 ${data.dailyNuance}`;
-    nuanceBox.style.display = 'block';
-  } else {
-    nuanceBox.style.display = 'none';
-  }
-
-  const photo = document.getElementById('result-photo');
-  photo.classList.remove('reveal-photo');
-  void photo.offsetWidth;
-  photo.classList.add('reveal-photo');
-}
-
 const PENDING_PAYMENT_KEY = 'faceReadingPendingPayment';
 const PAYMENT_AMOUNT = 490;
 let tossClientKey = null;
@@ -268,7 +225,8 @@ fetch('/api/config')
   })
   .catch(() => {});
 
-document.getElementById('btn-unlock').addEventListener('click', () => {
+// 결제 게이트는 지금 꺼져있어요(전부 무료). 나중에 재활성화할 때 쓸 함수만 남겨둠.
+function requestTossPayment() {
   if (!tossClientKey || !window.TossPayments) {
     alert('결제 기능이 아직 설정되지 않았어요.');
     return;
@@ -284,7 +242,7 @@ document.getElementById('btn-unlock').addEventListener('click', () => {
     successUrl: `${location.origin}/`,
     failUrl: `${location.origin}/`,
   });
-});
+}
 
 async function checkPendingPaymentReturn() {
   const params = new URLSearchParams(location.search);
@@ -329,7 +287,8 @@ async function checkPendingPaymentReturn() {
 }
 checkPendingPaymentReturn();
 
-document.getElementById('btn-share').addEventListener('click', async () => {
+// 공유 보너스도 결제 게이트와 함께 꺼져있어요. 나중에 재활성화할 때 쓸 함수만 남겨둠.
+async function requestKakaoShareBonus() {
   if (!authState.loggedIn) {
     showStep('login');
     return;
@@ -370,7 +329,7 @@ document.getElementById('btn-share').addEventListener('click', async () => {
   } catch (err) {
     alert('공유 보너스 처리 중 오류가 발생했어요.');
   }
-});
+}
 
 function renderPaidResult(data) {
   document.getElementById('paid-source-badge').textContent = state.paidByToss

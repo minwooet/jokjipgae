@@ -325,6 +325,17 @@ html, body {
   margin-bottom: 10px;
   font-family: 'Galmuri11', monospace;
 }
+.donate-box { background: linear-gradient(135deg, #fff8e1, #fff3e0); }
+.donate-account {
+  display: block;
+  text-align: center;
+  background: var(--card);
+  border: 2px solid var(--line);
+  box-shadow: 2px 2px 0 var(--line);
+  padding: 10px;
+  font-size: 12.5px;
+  user-select: all;
+}
 .badge-error {
   display: inline-block;
   background: #ffe3e3;
