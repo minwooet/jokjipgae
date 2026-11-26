@@ -121,6 +121,21 @@ async function handleAnalyze(req, res) {
         return;
       }
 
+      let dailyStatus = null;
+      if (userId) {
+        (await db.getUser(userId)) || (await db.upsertUser(userId, null));
+        const daily = await db.checkAndConsumeDailyUse(userId);
+        dailyStatus = daily;
+        if (!daily.allowed) {
+          res.writeHead(429, { 'Content-Type': 'application/json; charset=utf-8' });
+          res.end(JSON.stringify({
+            error: 'DAILY_LIMIT_REACHED',
+            message: `오늘 사용 가능한 ${daily.limit}회를 다 쓰셨어요. 내일 다시 이용해주세요!`,
+          }));
+          return;
+        }
+      }
+
       const apiKey = process.env.ANTHROPIC_API_KEY;
       if (!apiKey) {
         res.writeHead(503, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -141,18 +156,17 @@ async function handleAnalyze(req, res) {
       const cat = findCategory(parsed.category) || CATEGORIES[0];
       const compat = findCategory(parsed.compatibleWith) || CATEGORIES[1];
 
-      // ---- 전체 무료 공개 (결제/토큰 게이트 비활성화) ----
+      // ---- 전체 무료 공개 (결제/토큰 게이트 비활성화, 하루 5회 제한만 적용) ----
       // 토큰·결제 관련 함수(db.consumeToken, /api/payments/confirm 등)는
       // 나중에 유료 전환 시 바로 쓸 수 있도록 코드는 남겨두고 호출만 안 함.
-      if (userId) {
-        await db.getUser(userId) || (await db.upsertUser(userId, null));
-      }
       const unlockLevel = 'full';
 
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({
         faceDetected: true,
         unlockLevel,
+        dailyRemaining: dailyStatus?.remaining ?? null,
+        dailyLimit: dailyStatus?.limit ?? null,
         category: cat.name,
         emoji: cat.emoji,
         color: cat.color,
@@ -257,12 +271,15 @@ async function handleAuthMe(req, res) {
     return;
   }
   const user = await db.getUser(userId);
+  const daily = await db.getDailyUseStatus(userId);
   res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify({
     loggedIn: true,
     nickname: user?.nickname,
     tokens: user?.tokens ?? 0,
     shareBonusUsed: Boolean(user?.share_bonus_used),
+    dailyRemaining: daily.remaining,
+    dailyLimit: daily.limit,
   }));
 }
 

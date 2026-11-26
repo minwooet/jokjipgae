@@ -99,6 +99,7 @@ async function loadAuthState() {
       userChip.style.display = 'inline-block';
       userChip.textContent = `👋 ${authState.nickname || '회원'}님 (로그아웃)`;
       if (document.getElementById('step-login').classList.contains('active')) showStep('upload');
+      updateDailyCountBadge(authState.dailyRemaining, authState.dailyLimit);
     } else {
       loginBtn.style.display = 'inline-block';
       userChip.style.display = 'none';
@@ -109,6 +110,16 @@ async function loadAuthState() {
   }
 }
 loadAuthState();
+
+function updateDailyCountBadge(remaining, limit) {
+  const badge = document.getElementById('daily-count-badge');
+  if (remaining == null || limit == null) {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.textContent = `오늘 남은 횟수 ${remaining} / ${limit}`;
+  badge.style.display = 'inline-block';
+}
 
 document.getElementById('user-chip').addEventListener('click', async () => {
   await fetch('/api/auth/logout', { method: 'POST' });
@@ -182,6 +193,10 @@ async function runAnalysis() {
       showStep('login');
       return;
     }
+    if (data.error === 'DAILY_LIMIT_REACHED') {
+      showError(`⏰ ${data.message}`);
+      return;
+    }
     if (data.error) {
       showError(data.error);
       return;
@@ -194,6 +209,7 @@ async function runAnalysis() {
     state.basicResult = data;
     state.unlockedViaShare = false;
     state.paidByToss = false;
+    updateDailyCountBadge(data.dailyRemaining, data.dailyLimit);
 
     // 지금은 전부 무료 공개 (결제/공유 게이트 비활성화)
     renderPaidResult(data);

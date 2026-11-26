@@ -64,6 +64,39 @@ export async function grantShareBonus(userId) {
   return true;
 }
 
+const DAILY_LIMIT = 5;
+
+function kstDateString() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+export async function checkAndConsumeDailyUse(userId) {
+  const user = await getUser(userId);
+  const today = kstDateString();
+  const sameDay = user?.daily_uses_date === today;
+  const currentUses = sameDay ? user.daily_uses ?? 0 : 0;
+
+  if (currentUses >= DAILY_LIMIT) {
+    return { allowed: false, remaining: 0, limit: DAILY_LIMIT };
+  }
+
+  const newCount = currentUses + 1;
+  await fetch(restUrl(`app_users?id=eq.${encodeURIComponent(userId)}`), {
+    method: 'PATCH',
+    headers: headers(),
+    body: JSON.stringify({ daily_uses: newCount, daily_uses_date: today }),
+  });
+  return { allowed: true, remaining: DAILY_LIMIT - newCount, limit: DAILY_LIMIT };
+}
+
+export async function getDailyUseStatus(userId) {
+  const user = await getUser(userId);
+  const today = kstDateString();
+  const sameDay = user?.daily_uses_date === today;
+  const currentUses = sameDay ? user?.daily_uses ?? 0 : 0;
+  return { remaining: Math.max(0, DAILY_LIMIT - currentUses), limit: DAILY_LIMIT };
+}
+
 export async function addReview(userId, rating, comment) {
   await fetch(restUrl('reviews'), {
     method: 'POST',
